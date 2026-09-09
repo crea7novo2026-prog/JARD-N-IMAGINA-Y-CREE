@@ -1,0 +1,26 @@
+export const PAISES = [
+  { codigo: "505", nombre: "Nicaragua" },
+  { codigo: "503", nombre: "El Salvador" },
+  { codigo: "504", nombre: "Honduras" },
+  { codigo: "502", nombre: "Guatemala" },
+  { codigo: "506", nombre: "Costa Rica" },
+  { codigo: "507", nombre: "Panamá" },
+  { codigo: "52", nombre: "México" },
+  { codigo: "1", nombre: "EE. UU. / Canadá" },
+  { codigo: "57", nombre: "Colombia" },
+  { codigo: "58", nombre: "Venezuela" },
+  { codigo: "593", nombre: "Ecuador" },
+  { codigo: "51", nombre: "Perú" },
+  { codigo: "591", nombre: "Bolivia" },
+  { codigo: "56", nombre: "Chile" },
+  { codigo: "54", nombre: "Argentina" },
+  { codigo: "598", nombre: "Uruguay" },
+  { codigo: "595", nombre: "Paraguay" },
+  { codigo: "55", nombre: "Brasil" },
+  { codigo: "53", nombre: "Cuba" },
+  { codigo: "1809", nombre: "República Dominicana" },
+  { codigo: "1787", nombre: "Puerto Rico" },
+  { codigo: "34", nombre: "España" },
+] as const;
+
+export const PAIS_DEFECTO = "505";

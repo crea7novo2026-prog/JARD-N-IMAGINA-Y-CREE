@@ -87,7 +87,7 @@ export function PuertaCliente() {
           value={telefono}
           onChange={(e) => setTelefono(e.target.value.replace(/[^\d\s-]/g, ""))}
           inputMode="tel"
-          placeholder="7850 3734"
+          placeholder="Tu Número"
           className="h-12 min-w-0 flex-1 rounded-xl bg-superficie px-3 text-base outline-none"
         />
       </div>

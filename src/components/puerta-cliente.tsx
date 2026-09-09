@@ -26,14 +26,6 @@ export function PuertaCliente() {
       return;
     }
     setOcupado(true);
-    const r = await registrarCliente({
-      data: { correo: mail, pais, telefono: tel, nombre: nombre.trim() },
-    });
-    setOcupado(false);
-    if (!r.ok) {
-      setAviso(r.error ?? "No se pudo guardar. Revisa la red e inténtalo.");
-      return;
-    }
     setAjustes({
       correoCliente: mail,
       paisCliente: pais,
@@ -41,6 +33,8 @@ export function PuertaCliente() {
       nombreMostrar: nombre.trim(),
       clienteListo: true,
     });
+ 
+   
   }
 
   return (

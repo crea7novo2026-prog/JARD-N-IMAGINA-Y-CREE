@@ -31,9 +31,11 @@ const ajustes = useJardin((s) => s.ajustes);
   return (
     <div className="lienzo-app">
       <div className="marco-app">
-   const ajustes = useJardin((s) => s.ajustes);   
+        {!(ajustes.correoCliente.includes("@") && (ajustes.telefonoCliente || "").replace(/\D/g, "").length >= 6) ? (
           <PuertaCliente />
-        ) : (
+        ) : ( 
+        
+       
           <>
             <nav
               className="fixed bottom-0 left-1/2 z-40 w-full max-w-[430px] -translate-x-1/2 border-t border-borde bg-superficie/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md min-[900px]:static min-[900px]:max-w-none min-[900px]:translate-x-0 min-[900px]:border-r min-[900px]:border-t-0 min-[900px]:bg-superficie"

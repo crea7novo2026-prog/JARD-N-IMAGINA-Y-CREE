@@ -32,7 +32,14 @@ export function PuertaCliente() {
       telefonoCliente: tel,
       nombreMostrar: nombre.trim(),
       clienteListo: true,
-    });
+    });});
+    try {
+      await registrarCliente({
+        data: { correo: mail, pais, telefono: tel, nombre: nombre.trim() },
+      });
+    } catch {}
+    setOcupado(false);
+  }
  
    
   }

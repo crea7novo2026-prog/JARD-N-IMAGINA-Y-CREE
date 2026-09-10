@@ -19,7 +19,7 @@ const PESTANAS = [
 export function Cascaron({ children }: { children: React.ReactNode }) {
   const hidratar = useJardin((s) => s.hidratar);
 const ajustes = useJardin((s) => s.ajustes);
- !(ajustes.correoCliente.includes("@") && ajustes.telefonoCliente.replace(/\D/g, "").length >= 6)
+
 
   const ruta = useRouterState({ select: (s) => s.location.pathname });
 
@@ -31,7 +31,7 @@ const ajustes = useJardin((s) => s.ajustes);
   return (
     <div className="lienzo-app">
       <div className="marco-app">
-        {listo && !clienteListo ? (
+   const ajustes = useJardin((s) => s.ajustes);   
           <PuertaCliente />
         ) : (
           <>

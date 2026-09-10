@@ -18,8 +18,9 @@ const PESTANAS = [
 
 export function Cascaron({ children }: { children: React.ReactNode }) {
   const hidratar = useJardin((s) => s.hidratar);
-  const listo = useJardin((s) => s.listo);
-  const clienteListo = useJardin((s) => s.ajustes.clienteListo);
+const ajustes = useJardin((s) => s.ajustes);
+ !(ajustes.correoCliente.includes("@") && ajustes.telefonoCliente.replace(/\D/g, "").length >= 6)
+
   const ruta = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {

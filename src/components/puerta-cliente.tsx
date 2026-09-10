@@ -32,7 +32,7 @@ export function PuertaCliente() {
       telefonoCliente: tel,
       nombreMostrar: nombre.trim(),
       clienteListo: true,
-    });});
+    });
     try {
       await registrarCliente({
         data: { correo: mail, pais, telefono: tel, nombre: nombre.trim() },
@@ -42,7 +42,7 @@ export function PuertaCliente() {
   }
  
    
-  }
+  
 
   return (
     <main className="flex min-h-dvh flex-col justify-center px-6 pb-10 pt-12">

@@ -3,8 +3,10 @@ import { getSql } from "@/lib/db";
 import { CLAVE_AUTOR_DEFECTO } from "@/lib/marca";
 
 function claveAutorOk(clave?: string) {
-  const esperada = (typeof process !== "undefined" && process.env.AUTOR_CLAVE?.trim()) || CLAVE_AUTOR_DEFECTO;
-  return (clave ?? "").trim() === esperada;
+  const c = (clave ?? "").trim();
+  if (!c) return false;
+  const env = typeof process !== "undefined" ? process.env.AUTOR_CLAVE?.trim() : "";
+  return c === CLAVE_AUTOR_DEFECTO || (env ? c === env : false);
 }
 
 function correoOk(c: string) {
@@ -32,30 +34,43 @@ function vigente(pro: boolean, hasta?: string | Date | null) {
 export const registrarCliente = createServerFn({ method: "POST" })
   .validator((input: { correo: string; pais: string; telefono: string; nombre?: string }) => input)
   .handler(async ({ data }) => {
+    const vacio = { ok: false as const, error: "No se pudo guardar el cliente.", codigo: "", pro: false, proHasta: null as string | null };
     const correo = data.correo.trim().toLowerCase();
     const pais = data.pais.replace(/\D/g, "").slice(0, 5);
     const telefono = data.telefono.replace(/\D/g, "").slice(0, 15);
     const nombre = (data.nombre ?? "").trim().slice(0, 80);
-    if (!correoOk(correo)) return { ok: false as const, error: "Ese correo no se entiende.", codigo: "", pro: false, proHasta: null as string | null };
-    if (!pais || telefono.length < 6) return { ok: false as const, error: "Falta el teléfono con código de país.", codigo: "", pro: false, proHasta: null as string | null };
-    const sql = await getSql();
-    await asegurarColumnasPro();
-    const id = `cl_${correo.replace(/[^a-z0-9]/g, "").slice(0, 24)}`;
-    await sql`
-      insert into clientes_app (id, correo, pais, telefono, nombre, creado_en)
-      values (${id}, ${correo}, ${pais}, ${telefono}, ${nombre}, now())
-      on conflict (correo) do update set
-        pais = excluded.pais,
-        telefono = excluded.telefono,
-        nombre = excluded.nombre
-    `;
-    const filas = await sql.query<{ pro: boolean; pro_hasta: string | null }>(
-      "select coalesce(pro, false) as pro, pro_hasta from clientes_app where lower(correo) = $1 limit 1",
-      [correo],
-    );
-    const row = filas[0];
-    const pro = vigente(Boolean(row?.pro), row?.pro_hasta ?? null);
-    return { ok: true as const, codigo: codigoClienteDeCorreo(correo), pro, proHasta: row?.pro_hasta ?? null };
+    if (!correoOk(correo)) return { ...vacio, error: "Ese correo no se entiende." };
+    if (!pais || telefono.length < 6) return { ...vacio, error: "Falta el teléfono con código de país." };
+    try {
+      const sql = await getSql();
+      await asegurarColumnasPro();
+      const id = `cl_${correo.replace(/[^a-z0-9]/g, "").slice(0, 24)}`;
+      const ya = await sql.query<{ correo: string }>(
+        "select correo from clientes_app where lower(correo) = $1 or id = $2 limit 1",
+        [correo, id],
+      );
+      if (ya.length) {
+        await sql.query(
+          "update clientes_app set pais = $1, telefono = $2, nombre = $3 where lower(correo) = $4 or id = $5",
+          [pais, telefono, nombre, correo, id],
+        );
+      } else {
+        await sql.query(
+          "insert into clientes_app (id, correo, pais, telefono, nombre, creado_en) values ($1, $2, $3, $4, $5, now())",
+          [id, correo, pais, telefono, nombre],
+        );
+      }
+      const filas = await sql.query<{ pro: boolean; pro_hasta: string | null }>(
+        "select coalesce(pro, false) as pro, pro_hasta from clientes_app where lower(correo) = $1 or id = $2 limit 1",
+        [correo, id],
+      );
+      const row = filas[0];
+      const pro = vigente(Boolean(row?.pro), row?.pro_hasta ?? null);
+      return { ok: true as const, codigo: codigoClienteDeCorreo(correo), pro, proHasta: row?.pro_hasta ?? null };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Error de red o base.";
+      return { ...vacio, error: msg.slice(0, 140) };
+    }
   });
 
 export const listarClientes = createServerFn({ method: "POST" })
@@ -66,13 +81,9 @@ export const listarClientes = createServerFn({ method: "POST" })
     }
     const sql = await getSql();
     await asegurarColumnasPro();
-    const items = await sql`
-      select id, correo, pais, telefono, nombre, creado_en,
-        coalesce(pro, false) as pro, pro_en, pro_hasta
-      from clientes_app
-      order by creado_en desc
-      limit 500
-    ` as {
+    const items = (await sql.query(
+      "select id, correo, pais, telefono, nombre, creado_en, coalesce(pro, false) as pro, pro_en, pro_hasta from clientes_app order by creado_en desc limit 500",
+    )) as {
       id: string;
       correo: string;
       pais: string;
@@ -101,10 +112,11 @@ export const marcarProCliente = createServerFn({ method: "POST" })
     const dias = Math.max(1, Math.min(400, data.dias ?? 30));
     const sql = await getSql();
     await asegurarColumnasPro();
+    const hasta = new Date(Date.now() + dias * 24 * 60 * 60 * 1000).toISOString();
     const filas = data.pro
       ? await sql.query<{ correo: string }>(
-          "update clientes_app set pro = true, pro_en = now(), pro_hasta = now() + ($1 || ' days')::interval where lower(correo) = $2 returning correo",
-          [String(dias), correo],
+          "update clientes_app set pro = true, pro_en = now(), pro_hasta = $1 where lower(correo) = $2 returning correo",
+          [hasta, correo],
         )
       : await sql.query<{ correo: string }>(
           "update clientes_app set pro = false where lower(correo) = $1 returning correo",

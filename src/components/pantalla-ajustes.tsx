@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { LIMITE_GRATIS, useJardin } from "@/lib/almacen";
 import { pedirAvisos } from "@/lib/avisos";
+import { codigoClienteDeCorreo } from "@/lib/marca";
 import { traerJardin } from "@/lib/servidor/sincronizar";
 import { HojaPro } from "./hoja-pro";
 
@@ -16,6 +17,7 @@ export function PantallaAjustes() {
   const [claveRecibida, setClaveRecibida] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const codigo = ajustes.correoCliente.includes("@") ? codigoClienteDeCorreo(ajustes.correoCliente) : "";
 
   function bajarCopia() {
     const blob = new Blob([exportar()], { type: "application/json" });
@@ -29,14 +31,14 @@ export function PantallaAjustes() {
   }
 
   async function aplicarClave() {
-    const codigo = claveRecibida.trim().toUpperCase();
-    if (codigo.length < 4) {
+    const clave = claveRecibida.trim().toUpperCase();
+    if (clave.length < 4) {
       setMsg("Pega la clave que te dio el autor.");
       return;
     }
     setOcupado(true);
-    setAjustes({ codigoActualizacion: codigo, codigoJardin: codigo });
-    const r = await traerJardin({ data: { codigo } });
+    setAjustes({ codigoActualizacion: clave, codigoJardin: clave });
+    const r = await traerJardin({ data: { codigo: clave } });
     setOcupado(false);
     if (r.ok && r.carga) {
       try {
@@ -44,7 +46,7 @@ export function PantallaAjustes() {
       } catch {
         /* pack de vitrina u otro formato */
       }
-      setAjustes({ codigoActualizacion: codigo, syncEn: new Date().toISOString() });
+      setAjustes({ codigoActualizacion: clave, syncEn: new Date().toISOString() });
       setMsg("Actualización recibida. El diario y las ofertas se refrescan con esa clave.");
       return;
     }
@@ -97,6 +99,17 @@ export function PantallaAjustes() {
         Permitir notificaciones del navegador
       </button>
 
+      {codigo && (
+        <section className="mt-6 rounded-xl bg-superficie p-4">
+          <p className="text-sm font-medium">Tu código de cliente</p>
+          <p className="mt-1 text-sm text-silenciado">
+            Mándalo por WhatsApp cuando pagues Jardín Pro. El vivero lo usa para activarte.
+          </p>
+          <p className="mt-3 font-mono text-lg text-luna">{codigo}</p>
+          <p className="mt-1 text-xs text-silenciado">{ajustes.correoCliente}</p>
+        </section>
+      )}
+
       <section className="mt-6 rounded-xl bg-superficie p-4">
         <p className="text-sm font-medium">Actualizar con una clave compartida</p>
         <p className="mt-1 text-sm text-silenciado">
@@ -125,7 +138,7 @@ export function PantallaAjustes() {
         <p className="text-sm font-medium">Plan</p>
         <p className="mt-1 text-sm text-silenciado">
           {ajustes.demoPro
-            ? "Demo Pro activa en este aparato."
+            ? "Jardín Pro activo en este aparato."
             : `Cortesía: ${plantas.length} / ${LIMITE_GRATIS} plantas. Luego $2/mes o $20/año.`}
         </p>
         {!ajustes.demoPro && (

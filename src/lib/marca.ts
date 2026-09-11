@@ -1,7 +1,7 @@
 export const APP_NAME = "El Diario de las Bitácoras del Jardín y Luna";
 export const APP_CORTO = "Diario y Luna";
 export const APP_FRASE = "El diario de tu jardín, unido por la luna y la bitácora.";
-export const VIVERO_NOMBRE = "ABBA ROSEUS CLERODENDRUM";
+export const VIVERO_NOMBRE = "ABBA ROSEUS CLERODENDRUM VIVEROS";
 export const SALA_VIVERO = "ABBA-ROSEUS";
 export const SALA_COMUNIDAD = "ABBA-ROSEUS";
 export const CLAVE_AUTOR_DEFECTO = "LUNA-DIARIO";

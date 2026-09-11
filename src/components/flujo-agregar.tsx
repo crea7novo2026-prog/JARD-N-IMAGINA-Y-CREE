@@ -56,11 +56,11 @@ export function FlujoAgregar() {
     setError("");
   }
 
-  async function cargarFicha(id?: string, nombre?: string, cientifico?: string) {
+  async function cargarFicha(id?: string, nombre?: string, cientifico?: string, fichaFoto?: string) {
     let esp = id ? especiePorId(id) : undefined;
     const comun = esp?.nombreComun || nombre || "";
-    if (!comun) return;
-    if (!esp) {
+    if (!comun && !fichaFoto) return;
+    if (comun && !esp) {
       const nueva = especieEnBlanco({
         nombreComun: comun,
         nombreCientifico: cientifico,
@@ -70,17 +70,16 @@ export function FlujoAgregar() {
       setEspecieId(nueva.id);
       setSugeridas((prev) => [nueva.id, ...prev]);
     }
-    setFicha(
-      fichaDeCatalogo(esp.id) ||
-        `Buscando ficha de ${comun}${cientifico ? ` (${cientifico})` : ""}…`,
-    );
+    if (fichaFoto) setFicha(fichaFoto);
+    else if (esp) setFicha(fichaDeCatalogo(esp.id) || `Buscando ficha de ${comun}…`);
+    if (!comun) return;
     try {
-      const extra = await fichaAutomatica(comun, esp.nombreCientifico || cientifico);
-      if (extra) setFicha(extra);
+      const extra = await fichaAutomatica(comun, esp?.nombreCientifico || cientifico);
+      if (extra) setFicha(fichaFoto ? `${fichaFoto}\n\n${extra}` : extra);
     } catch {
-      setFicha(
-        `${comun}${cientifico ? ` (${cientifico})` : ""}. Luz de sol o sol filtrado. Riego cuando seque la tierra. Poda ramas secas.`,
-      );
+      if (!fichaFoto) {
+        setFicha(`${comun}. Luz buena. Riego cuando seque. Abono cada mes en crecimiento.`);
+      }
     }
   }
 
@@ -105,20 +104,29 @@ export function FlujoAgregar() {
       const data = await comprimirFoto(f);
       setFoto(data);
       const r = await sugerirEspeciePorFoto({ data: { dataUrl: data } });
-      const ids = (r.ids?.length ? r.ids : pistas).filter(Boolean);
+      const porNombre = r.nombre ? buscarEspecies(r.nombre)[0]?.id : undefined;
+      const ids = (r.ids?.length ? r.ids : [porNombre, ...pistas].filter(Boolean)) as string[];
+      if (r.nombre) {
+        setQ(r.nombre);
+        setApodo(r.nombre);
+      }
       if (ids[0]) {
         setSugeridas(ids);
         elegir(ids[0]);
-        await cargarFicha(ids[0], r.nombre, r.cientifico);
-      } else if (r.nombre) {
-        setQ(r.nombre);
-        setApodo(r.nombre);
-        await cargarFicha(undefined, r.nombre, r.cientifico);
+      }
+      if (r.nombre || r.ficha) {
+        await cargarFicha(ids[0], r.nombre, r.cientifico, r.ficha);
       } else {
-        setError("No salió el nombre. Escríbelo abajo.");
+        const extra =
+          r.error === "sin_ia"
+            ? "Falta la clave de IA en el servidor."
+            : r.error
+              ? `No se pudo leer la foto (${r.error}).`
+              : "No salió el nombre. Escríbelo abajo.";
+        setError(extra);
       }
     } catch {
-      setError("No se pudo leer la foto. Prueba otra.");
+      setError("No se pudo leer la foto. Prueba otra o escribe el nombre.");
     } finally {
       setLeyendo(false);
     }
@@ -173,7 +181,7 @@ export function FlujoAgregar() {
     <main className="px-5 pb-10 pt-8">
       <h1 className="text-2xl font-semibold">Nueva planta</h1>
       <p className="mt-2 text-base leading-relaxed text-silenciado">
-        Toma la foto. La app busca el nombre y el cuidado enseguida.
+        Toma la foto. Sale el nombre, riego, abono y plagas.
       </p>
       <div className="mt-4">
         <BarraDemo />
@@ -199,7 +207,7 @@ export function FlujoAgregar() {
       <input ref={archivoRef} type="file" accept="image/*" className="hidden" onChange={(e) => void onFoto(e.target.files?.[0])} />
 
       {foto && <MarcadorFoto src={foto} alt="" className="mt-4 max-h-64 w-full rounded-xl" />}
-      {leyendo && <p className="mt-3 text-sm text-luna">Buscando el nombre y el cuidado…</p>}
+      {leyendo && <p className="mt-3 text-sm text-luna">Buscando nombre, riego, abono y plagas…</p>}
       {especie && <ResumenCuidado especie={especie} />}
       {ficha && (
         <section className="mt-3 rounded-xl bg-superficie p-4 text-sm leading-relaxed text-silenciado">

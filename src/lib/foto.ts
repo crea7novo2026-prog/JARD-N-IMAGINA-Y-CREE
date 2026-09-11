@@ -1,5 +1,5 @@
-const ANCHO_MAX = 720;
-const CALIDAD = 0.72;
+const ANCHO_MAX = 512;
+const CALIDAD = 0.62;
 
 export function comprimirFoto(archivo: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -9,7 +9,7 @@ export function comprimirFoto(archivo: File): Promise<string> {
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.onload = () => {
-        const escala = Math.min(1, ANCHO_MAX / img.width);
+        const escala = Math.min(1, ANCHO_MAX / Math.max(img.width, img.height));
         const w = Math.max(1, Math.round(img.width * escala));
         const h = Math.max(1, Math.round(img.height * escala));
         const lienzo = document.createElement("canvas");

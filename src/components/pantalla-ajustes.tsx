@@ -26,6 +26,15 @@ export function PantallaAjustes() {
     setMsg("Copia descargada.");
   }
 
+  function cerrarCuenta() {
+    setAjustes({
+      correoCliente: "",
+      telefonoCliente: "",
+      clienteListo: false,
+      demoPro: false,
+    });
+  }
+
   return (
     <main className="px-5 pb-8 pt-8">
       <p className="text-xs font-medium uppercase tracking-[0.18em] text-silenciado">Cliente</p>
@@ -80,6 +89,9 @@ export function PantallaAjustes() {
           </p>
           <p className="mt-3 font-mono text-lg text-luna">{codigo}</p>
           <p className="mt-1 text-xs text-silenciado">{ajustes.correoCliente}</p>
+          <button type="button" onClick={cerrarCuenta} className="mt-3 h-11 w-full rounded-lg bg-superficie-2 text-sm">
+            Cerrar sesión y pedir correo otra vez
+          </button>
         </section>
       )}
 

@@ -20,6 +20,13 @@ async function asegurarColumnasPro() {
   const sql = await getSql();
   await sql.query("alter table clientes_app add column if not exists pro boolean not null default false");
   await sql.query("alter table clientes_app add column if not exists pro_en timestamptz");
+  await sql.query("alter table clientes_app add column if not exists pro_hasta timestamptz");
+}
+
+function vigente(pro: boolean, hasta?: string | Date | null) {
+  if (!pro) return false;
+  if (!hasta) return true;
+  return new Date(hasta).getTime() > Date.now();
 }
 
 export const registrarCliente = createServerFn({ method: "POST" })
@@ -29,8 +36,8 @@ export const registrarCliente = createServerFn({ method: "POST" })
     const pais = data.pais.replace(/\D/g, "").slice(0, 5);
     const telefono = data.telefono.replace(/\D/g, "").slice(0, 15);
     const nombre = (data.nombre ?? "").trim().slice(0, 80);
-    if (!correoOk(correo)) return { ok: false as const, error: "Ese correo no se entiende.", codigo: "" };
-    if (!pais || telefono.length < 6) return { ok: false as const, error: "Falta el teléfono con código de país.", codigo: "" };
+    if (!correoOk(correo)) return { ok: false as const, error: "Ese correo no se entiende.", codigo: "", pro: false, proHasta: null as string | null };
+    if (!pais || telefono.length < 6) return { ok: false as const, error: "Falta el teléfono con código de país.", codigo: "", pro: false, proHasta: null as string | null };
     const sql = await getSql();
     await asegurarColumnasPro();
     const id = `cl_${correo.replace(/[^a-z0-9]/g, "").slice(0, 24)}`;
@@ -42,7 +49,13 @@ export const registrarCliente = createServerFn({ method: "POST" })
         telefono = excluded.telefono,
         nombre = excluded.nombre
     `;
-    return { ok: true as const, codigo: codigoClienteDeCorreo(correo) };
+    const filas = await sql.query<{ pro: boolean; pro_hasta: string | null }>(
+      "select coalesce(pro, false) as pro, pro_hasta from clientes_app where lower(correo) = $1 limit 1",
+      [correo],
+    );
+    const row = filas[0];
+    const pro = vigente(Boolean(row?.pro), row?.pro_hasta ?? null);
+    return { ok: true as const, codigo: codigoClienteDeCorreo(correo), pro, proHasta: row?.pro_hasta ?? null };
   });
 
 export const listarClientes = createServerFn({ method: "POST" })
@@ -53,7 +66,13 @@ export const listarClientes = createServerFn({ method: "POST" })
     }
     const sql = await getSql();
     await asegurarColumnasPro();
-    const items = await sql<{
+    const items = await sql`
+      select id, correo, pais, telefono, nombre, creado_en,
+        coalesce(pro, false) as pro, pro_en, pro_hasta
+      from clientes_app
+      order by creado_en desc
+      limit 500
+    ` as {
       id: string;
       correo: string;
       pais: string;
@@ -61,30 +80,36 @@ export const listarClientes = createServerFn({ method: "POST" })
       nombre: string;
       creado_en: string;
       pro: boolean;
-    }>`
-      select id, correo, pais, telefono, nombre, creado_en, coalesce(pro, false) as pro
-      from clientes_app
-      order by creado_en desc
-      limit 500
-    `;
+      pro_en: string | null;
+      pro_hasta: string | null;
+    }[];
     return {
       ok: true as const,
-      items: items.map((c) => ({ ...c, codigo: codigoClienteDeCorreo(c.correo) })),
+      items: items.map((c) => {
+        const activo = vigente(Boolean(c.pro), c.pro_hasta);
+        return { ...c, pro: activo, codigo: codigoClienteDeCorreo(c.correo) };
+      }),
     };
   });
 
 export const marcarProCliente = createServerFn({ method: "POST" })
-  .validator((input: { claveAutor?: string; correo: string; pro: boolean }) => input)
+  .validator((input: { claveAutor?: string; correo: string; pro: boolean; dias?: number }) => input)
   .handler(async ({ data }) => {
     if (!claveAutorOk(data.claveAutor)) return { ok: false as const, error: "Solo el autor puede activar Pro." };
     const correo = data.correo.trim().toLowerCase();
     if (!correoOk(correo)) return { ok: false as const, error: "Correo no válido." };
+    const dias = Math.max(1, Math.min(400, data.dias ?? 30));
     const sql = await getSql();
     await asegurarColumnasPro();
-    const filas = await sql.query<{ correo: string }>(
-      "update clientes_app set pro = $1, pro_en = case when $1 then now() else null end where lower(correo) = $2 returning correo",
-      [data.pro, correo],
-    );
+    const filas = data.pro
+      ? await sql.query<{ correo: string }>(
+          "update clientes_app set pro = true, pro_en = now(), pro_hasta = now() + ($1 || ' days')::interval where lower(correo) = $2 returning correo",
+          [String(dias), correo],
+        )
+      : await sql.query<{ correo: string }>(
+          "update clientes_app set pro = false where lower(correo) = $1 returning correo",
+          [correo],
+        );
     if (!filas.length) return { ok: false as const, error: "No está ese cliente. Pídele que abra la app una vez." };
     return { ok: true as const };
   });
@@ -93,16 +118,20 @@ export const estadoProCliente = createServerFn({ method: "POST" })
   .validator((input: { correo: string }) => input)
   .handler(async ({ data }) => {
     const correo = data.correo.trim().toLowerCase();
-    if (!correoOk(correo)) return { ok: true as const, pro: false, codigo: "" };
+    if (!correoOk(correo)) return { ok: true as const, pro: false, codigo: "", proEn: null as string | null, proHasta: null as string | null };
     const sql = await getSql();
     await asegurarColumnasPro();
-    const filas = await sql.query<{ pro: boolean }>(
-      "select coalesce(pro, false) as pro from clientes_app where lower(correo) = $1 limit 1",
+    const filas = await sql.query<{ pro: boolean; pro_en: string | null; pro_hasta: string | null }>(
+      "select coalesce(pro, false) as pro, pro_en, pro_hasta from clientes_app where lower(correo) = $1 limit 1",
       [correo],
     );
+    const row = filas[0];
+    const pro = vigente(Boolean(row?.pro), row?.pro_hasta ?? null);
     return {
       ok: true as const,
-      pro: Boolean(filas[0]?.pro),
+      pro,
       codigo: codigoClienteDeCorreo(correo),
+      proEn: row?.pro_en ?? null,
+      proHasta: row?.pro_hasta ?? null,
     };
   });

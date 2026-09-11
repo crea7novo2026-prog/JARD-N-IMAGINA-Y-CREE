@@ -11,7 +11,16 @@ type Fila = {
   creado_en: string;
   pro: boolean;
   codigo: string;
+  pro_en?: string | null;
+  pro_hasta?: string | null;
 };
+
+function fechaCorta(iso?: string | null) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("es-NI", { day: "2-digit", month: "short", year: "numeric" });
+}
 
 export function ListaClientes() {
   const [items, setItems] = useState<Fila[]>([]);
@@ -31,15 +40,15 @@ export function ListaClientes() {
     void cargar();
   }, []);
 
-  async function cambiarPro(correo: string, pro: boolean) {
+  async function cambiarPro(correo: string, pro: boolean, dias = 30) {
     setOcupado(correo);
-    const r = await marcarProCliente({ data: { claveAutor: CLAVE_AUTOR_DEFECTO, correo, pro } });
+    const r = await marcarProCliente({ data: { claveAutor: CLAVE_AUTOR_DEFECTO, correo, pro, dias } });
     setOcupado("");
     if (!r.ok) {
       setAviso(r.error ?? "No se pudo cambiar Pro.");
       return;
     }
-    setAviso(pro ? `Pro activado para ${correo}` : `Pro quitado a ${correo}`);
+    setAviso(pro ? `Pro ${dias} días para ${correo}` : `Pro quitado a ${correo}`);
     await cargar();
   }
 
@@ -47,7 +56,7 @@ export function ListaClientes() {
     <section className="mt-5 rounded-xl bg-superficie p-4">
       <p className="text-sm font-medium">Base de clientes (solo tú)</p>
       <p className="mt-1 text-xs text-silenciado">
-        Cuando te paguen, toca Activar Pro. El cliente abre la app y se desbloquea solo.
+        Activar Pro suma 30 días. Si ya había pagado y se le acabó, vuelve a activar cuando cancele.
       </p>
       <p className="mt-2 text-xs text-luna">{items.length} cliente(s)</p>
       <ul className="mt-3 max-h-80 space-y-2 overflow-auto text-xs">
@@ -59,15 +68,37 @@ export function ListaClientes() {
               +{c.pais} {c.telefono}
             </p>
             <p className="mt-1 font-mono text-luna">{c.codigo}</p>
-            <p className={c.pro ? "text-ok" : "text-silenciado"}>{c.pro ? "Pro activo" : "Cortesía"}</p>
-            <button
-              type="button"
-              disabled={ocupado === c.correo}
-              onClick={() => void cambiarPro(c.correo, !c.pro)}
-              className="mt-2 h-9 w-full rounded-md bg-luna text-xs font-semibold text-fondo disabled:opacity-60"
-            >
-              {c.pro ? "Quitar Pro" : "Activar Pro"}
-            </button>
+            <p className={c.pro ? "text-ok" : "text-silenciado"}>{c.pro ? "Pro vigente" : "Cortesía / vencido"}</p>
+            <p className="mt-1 text-silenciado">Activado: {fechaCorta(c.pro_en)}</p>
+            <p className="text-silenciado">Vence: {fechaCorta(c.pro_hasta)}</p>
+            <div className="mt-2 grid grid-cols-2 gap-1">
+              <button
+                type="button"
+                disabled={ocupado === c.correo}
+                onClick={() => void cambiarPro(c.correo, true, 30)}
+                className="h-9 rounded-md bg-luna text-[11px] font-semibold text-fondo disabled:opacity-60"
+              >
+                Activar 30 días
+              </button>
+              <button
+                type="button"
+                disabled={ocupado === c.correo}
+                onClick={() => void cambiarPro(c.correo, true, 365)}
+                className="h-9 rounded-md bg-superficie text-[11px] font-semibold disabled:opacity-60"
+              >
+                Activar 1 año
+              </button>
+            </div>
+            {c.pro && (
+              <button
+                type="button"
+                disabled={ocupado === c.correo}
+                onClick={() => void cambiarPro(c.correo, false)}
+                className="mt-1 h-8 w-full rounded-md bg-superficie text-[11px] disabled:opacity-60"
+              >
+                Quitar Pro ahora
+              </button>
+            )}
           </li>
         ))}
       </ul>

@@ -57,15 +57,30 @@ export function FlujoAgregar() {
   }
 
   async function cargarFicha(id?: string, nombre?: string, cientifico?: string) {
-    const esp = id ? especiePorId(id) : undefined;
+    let esp = id ? especiePorId(id) : undefined;
     const comun = esp?.nombreComun || nombre || "";
     if (!comun) return;
-    setFicha(esp ? fichaDeCatalogo(esp.id) : `Nombre: ${comun}${cientifico ? ` (${cientifico})` : ""}`);
+    if (!esp) {
+      const nueva = especieEnBlanco({
+        nombreComun: comun,
+        nombreCientifico: cientifico,
+      });
+      guardarEsp(nueva);
+      esp = nueva;
+      setEspecieId(nueva.id);
+      setSugeridas((prev) => [nueva.id, ...prev]);
+    }
+    setFicha(
+      fichaDeCatalogo(esp.id) ||
+        `Buscando ficha de ${comun}${cientifico ? ` (${cientifico})` : ""}…`,
+    );
     try {
-      const extra = await fichaAutomatica(comun, esp?.nombreCientifico || cientifico);
+      const extra = await fichaAutomatica(comun, esp.nombreCientifico || cientifico);
       if (extra) setFicha(extra);
     } catch {
-      /* sin red */
+      setFicha(
+        `${comun}${cientifico ? ` (${cientifico})` : ""}. Luz de sol o sol filtrado. Riego cuando seque la tierra. Poda ramas secas.`,
+      );
     }
   }
 

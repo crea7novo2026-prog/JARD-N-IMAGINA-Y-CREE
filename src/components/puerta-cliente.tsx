@@ -25,31 +25,46 @@ export function PuertaCliente() {
       setAviso("Escribe tu número de teléfono.");
       return;
     }
+    if (!nombre.trim()) {
+      setAviso("Escribe tu nombre.");
+      return;
+    }
     setOcupado(true);
-    setAjustes({
-      correoCliente: mail,
-      paisCliente: pais,
-      telefonoCliente: tel,
-      nombreMostrar: nombre.trim(),
-      clienteListo: true,
-    });
     try {
-      await registrarCliente({
+      const r = await registrarCliente({
         data: { correo: mail, pais, telefono: tel, nombre: nombre.trim() },
       });
-    } catch {}
+      if (!r.ok) {
+        setAviso(r.error ?? "No se pudo guardar.");
+        setOcupado(false);
+        return;
+      }
+      setAjustes({
+        correoCliente: mail,
+        paisCliente: pais,
+        telefonoCliente: tel,
+        nombreMostrar: nombre.trim(),
+        clienteListo: true,
+        demoPro: Boolean(r.pro),
+      });
+    } catch {
+      setAjustes({
+        correoCliente: mail,
+        paisCliente: pais,
+        telefonoCliente: tel,
+        nombreMostrar: nombre.trim(),
+        clienteListo: true,
+      });
+    }
     setOcupado(false);
   }
- 
-   
-  
 
   return (
     <main className="flex min-h-dvh flex-col justify-center px-6 pb-10 pt-12">
       <p className="text-xs uppercase tracking-[0.16em] text-luna">{APP_CORTO}</p>
       <h1 className="mt-2 font-serif text-3xl leading-tight text-luna">{APP_NAME}</h1>
       <p className="mt-3 text-base leading-relaxed text-silenciado">
-        Para abrir tu diario, deja un correo y un teléfono. Así el vivero puede atenderte.
+        Si desinstalaste la app, vuelve a dejar nombre, correo y teléfono. Si ya estabas, no se duplica.
       </p>
 
       <label className="mt-6 block text-sm">
@@ -92,7 +107,7 @@ export function PuertaCliente() {
           className="h-12 min-w-0 flex-1 rounded-xl bg-superficie px-3 text-base outline-none"
         />
       </div>
-      <p className="mt-2 text-xs text-silenciado">Ejemplo Nicaragua: +505 y tu número.</p>
+      <p className="mt-2 text-xs text-silenciado">Usa el mismo correo de siempre para no perder el Pro.</p>
 
       <button
         type="button"

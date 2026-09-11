@@ -1,6 +1,9 @@
+import { Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { especieEnBlanco, especiePorId } from "@/lib/catalogo-especies";
 import { useJardin } from "@/lib/almacen";
 import { formatearFecha } from "@/lib/utils";
+import type { Conocimiento } from "@/lib/tipos";
 
 const TIPOS = [
   "todos",
@@ -14,22 +17,62 @@ const TIPOS = [
   "otro",
 ] as const;
 
+function CuerpoOrdenado({ texto }: { texto: string }) {
+  const partes = texto
+    .split(/\n(?=\d+\.\s)/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (partes.length < 2) {
+    return <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-silenciado">{texto}</p>;
+  }
+  return (
+    <div className="mt-2 space-y-3">
+      {partes.map((p) => (
+        <p key={p.slice(0, 40)} className="whitespace-pre-wrap text-sm leading-relaxed text-silenciado">
+          {p}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 export function PantallaBitacora() {
   const bitacora = useJardin((s) => s.bitacora);
   const plantas = useJardin((s) => s.plantas);
   const conocimiento = useJardin((s) => s.conocimiento);
   const registrar = useJardin((s) => s.registrar);
   const codigo = useJardin((s) => s.ajustes.codigoJardin);
+  const autor = useJardin((s) => s.ajustes.modoAutor);
+  const guardarEsp = useJardin((s) => s.guardarEspecieCatalogo);
+  const guardarFicha = useJardin((s) => s.guardarFichaAutor);
   const [filtro, setFiltro] = useState<(typeof TIPOS)[number]>("todos");
   const [titulo, setTitulo] = useState("");
   const [nota, setNota] = useState("");
   const [plantaId, setPlantaId] = useState("");
   const [tipo, setTipo] = useState<(typeof TIPOS)[number]>("observacion");
+  const [aviso, setAviso] = useState("");
 
   const lista = useMemo(
     () => bitacora.filter((b) => filtro === "todos" || b.tipo === filtro),
     [bitacora, filtro],
   );
+
+  function llevarAlTaller(c: Conocimiento) {
+    const planta = c.plantaId ? plantas.find((p) => p.id === c.plantaId) : undefined;
+    let esp = (planta?.especieId && especiePorId(planta.especieId)) || (c.especieId ? especiePorId(c.especieId) : undefined);
+    const nombre = c.titulo.replace(/^Ficha \s*[·.]\s*/i, "").trim() || planta?.apodo || "Planta de comunidad";
+    if (!esp) {
+      esp = especieEnBlanco({ nombreComun: nombre });
+    }
+    guardarEsp(esp);
+    guardarFicha({
+      especieId: esp.id,
+      cuerpo: c.cuerpo,
+      fuentes: "Cuaderno vivo de la comunidad",
+      actualizadoEn: new Date().toISOString(),
+    });
+    setAviso(`Lista para editar en el taller: ${esp.nombreComun}. Ábrelo, corrige y luego Publica.`);
+  }
 
   return (
     <main className="px-5 pb-8 pt-8">
@@ -37,7 +80,7 @@ export function PantallaBitacora() {
       <h1 className="mt-1 text-2xl font-semibold">Diario del jardín</h1>
       <p className="mt-1 text-sm text-silenciado">
         Lo que anotas aquí lo ve la comunidad unida a este jardín
-        {codigo ? ` (${codigo})` : ", cuando publiques un código en Ajustes"}.
+        {codigo ? ` (${codigo})` : ""}.
       </p>
 
       <form
@@ -99,15 +142,36 @@ export function PantallaBitacora() {
       {conocimiento.length > 0 && (
         <section className="mt-6">
           <h2 className="text-sm font-semibold">Cuaderno vivo de la comunidad</h2>
-          <ul className="mt-2 space-y-2">
+          <p className="mt-1 text-xs text-silenciado">
+            Fichas que salen al identificar una planta. El autor puede llevarlas al taller, corregirlas y luego publicarlas.
+          </p>
+          <ul className="mt-2 space-y-3">
             {conocimiento.slice(0, 20).map((c) => (
               <li key={c.id} className="rounded-xl bg-superficie p-4">
                 <p className="text-xs text-luna">Nota compartida</p>
                 <p className="mt-1 text-sm font-medium">{c.titulo}</p>
-                <p className="mt-1 text-sm text-silenciado">{c.cuerpo}</p>
+                <CuerpoOrdenado texto={c.cuerpo} />
+                {autor && (
+                  <div className="mt-3 grid gap-2">
+                    <button
+                      type="button"
+                      onClick={() => llevarAlTaller(c)}
+                      className="h-11 rounded-lg bg-luna text-xs font-semibold text-fondo"
+                    >
+                      Llevar al taller y catálogo
+                    </button>
+                    <Link
+                      to="/autor"
+                      className="flex h-10 items-center justify-center rounded-lg bg-superficie-2 text-xs font-medium"
+                    >
+                      Abrir taller para editar
+                    </Link>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
+          {aviso && <p className="mt-3 text-sm text-ok">{aviso}</p>}
         </section>
       )}
 
@@ -139,7 +203,7 @@ export function PantallaBitacora() {
                 {b.plantaId ? ` · ${plantas.find((p) => p.id === b.plantaId)?.apodo ?? ""}` : ""}
               </p>
               <p className="mt-1 text-sm font-medium">{b.titulo}</p>
-              {b.nota && <p className="mt-1 text-sm text-silenciado">{b.nota}</p>}
+              {b.nota && <p className="mt-1 whitespace-pre-wrap text-sm text-silenciado">{b.nota}</p>}
             </li>
           ))}
         </ul>

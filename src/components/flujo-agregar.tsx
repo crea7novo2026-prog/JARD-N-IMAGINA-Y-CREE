@@ -72,6 +72,7 @@ export function FlujoAgregar() {
       if (ids[0]) {
         setSugeridas(ids);
         elegir(ids[0]);
+        setLeyendo(false);
       } else {
         setLeyendo(false);
         setError("No salió el nombre. Escríbelo abajo.");

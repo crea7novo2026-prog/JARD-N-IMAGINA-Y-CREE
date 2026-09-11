@@ -46,6 +46,11 @@ export function FlujoAgregar() {
   const especie = especieId ? especiePorId(especieId) : undefined;
   const nombreBusca = (especie?.nombreComun || q).trim();
 
+  function notaDelTaller(id?: string) {
+    if (!id) return "";
+    return useJardin.getState().fichasAutor.find((f) => f.especieId === id)?.cuerpo ?? "";
+  }
+
   function elegir(id: string) {
     setEspecieId(id);
     const esp = especiePorId(id);
@@ -70,14 +75,19 @@ export function FlujoAgregar() {
       setEspecieId(nueva.id);
       setSugeridas((prev) => [nueva.id, ...prev]);
     }
-    if (fichaFoto) setFicha(fichaFoto);
-    else if (esp) setFicha(fichaDeCatalogo(esp.id) || `Buscando ficha de ${comun}…`);
+    const notaAutor = notaDelTaller(esp?.id);
+    if (esp) setFicha(fichaDeCatalogo(esp.id, notaAutor) || `Buscando ficha de ${comun}…`);
+    else if (fichaFoto) setFicha(fichaFoto);
     if (!comun) return;
     try {
-      const extra = await fichaAutomatica(comun, esp?.nombreCientifico || cientifico);
-      if (extra) setFicha(fichaFoto ? `${fichaFoto}\n\n${extra}` : extra);
+      const extra = await fichaAutomatica(comun, esp?.nombreCientifico || cientifico, {
+        especieId: esp?.id,
+        notaAutor,
+        fichaFoto,
+      });
+      if (extra) setFicha(extra);
     } catch {
-      if (!fichaFoto) {
+      if (!ficha) {
         setFicha(`${comun}. Luz buena. Riego cuando seque. Abono cada mes en crecimiento.`);
       }
     }
@@ -119,7 +129,7 @@ export function FlujoAgregar() {
       } else {
         const extra =
           r.error === "sin_ia"
-            ? "Falta la clave de IA en el servidor."
+            ? "Falta la clave de identificación en el servidor."
             : r.error
               ? `No se pudo leer la foto (${r.error}).`
               : "No salió el nombre. Escríbelo abajo.";
@@ -169,6 +179,7 @@ export function FlujoAgregar() {
       tamanoMaceta: "mediana",
       fechaAdquisicion: new Date(aIsoDia(new Date()) + "T12:00:00").toISOString(),
       fotoDataUrl: foto,
+      notasPersonales: ficha,
     });
     if (!planta) {
       setPro(true);
@@ -181,7 +192,7 @@ export function FlujoAgregar() {
     <main className="px-5 pb-10 pt-8">
       <h1 className="text-2xl font-semibold">Nueva planta</h1>
       <p className="mt-2 text-base leading-relaxed text-silenciado">
-        Toma la foto. Sale el nombre, riego, abono y plagas.
+        Foto o nombre. Sale la investigación: hábitat, abono, plagas y consejos.
       </p>
       <div className="mt-4">
         <BarraDemo />
@@ -207,11 +218,11 @@ export function FlujoAgregar() {
       <input ref={archivoRef} type="file" accept="image/*" className="hidden" onChange={(e) => void onFoto(e.target.files?.[0])} />
 
       {foto && <MarcadorFoto src={foto} alt="" className="mt-4 max-h-64 w-full rounded-xl" />}
-      {leyendo && <p className="mt-3 text-sm text-luna">Buscando nombre, riego, abono y plagas…</p>}
+      {leyendo && <p className="mt-3 text-sm text-luna">Armando la investigación de la planta…</p>}
       {especie && <ResumenCuidado especie={especie} />}
       {ficha && (
         <section className="mt-3 rounded-xl bg-superficie p-4 text-sm leading-relaxed text-silenciado">
-          <p className="text-xs uppercase tracking-[0.14em] text-luna">Información</p>
+          <p className="text-xs uppercase tracking-[0.14em] text-luna">Investigación</p>
           <p className="mt-2 whitespace-pre-wrap">{ficha}</p>
         </section>
       )}
@@ -312,7 +323,7 @@ export function FlujoAgregar() {
       >
         Agregar al jardín
       </button>
-      <p className="mt-2 text-center text-xs text-silenciado">Después puedes cambiar foto, nombre y notas.</p>
+      <p className="mt-2 text-center text-xs text-silenciado">La investigación queda guardada en la planta.</p>
       <HojaPro abierta={pro} onCerrar={() => setPro(false)} />
     </main>
   );

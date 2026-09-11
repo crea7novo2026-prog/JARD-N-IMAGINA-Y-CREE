@@ -26,7 +26,7 @@ export function PantallaAjustes() {
     setMsg("Copia descargada.");
   }
 
-  function cerrarCuenta() {
+  function cerrarSesion() {
     setAjustes({
       correoCliente: "",
       telefonoCliente: "",
@@ -42,6 +42,19 @@ export function PantallaAjustes() {
       <p className="mt-1 text-sm text-silenciado">
         El vivero actualiza la app desde el taller. Aquí no hace falta ninguna clave.
       </p>
+
+      <section className="mt-6 rounded-xl bg-superficie p-4">
+        <p className="text-sm font-medium">Sesión</p>
+        <p className="mt-1 text-sm text-silenciado">
+          Cerrar sesión pide otra vez nombre, correo y teléfono. Si son los mismos, no se duplica en la base.
+        </p>
+        {ajustes.correoCliente.includes("@") && (
+          <p className="mt-2 text-xs text-luna">{ajustes.correoCliente}</p>
+        )}
+        <button type="button" onClick={cerrarSesion} className="mt-3 h-12 w-full rounded-lg bg-luna text-sm font-semibold text-fondo">
+          Cerrar sesión
+        </button>
+      </section>
 
       <label className="mt-6 block text-sm">
         Nombre para mostrar
@@ -89,9 +102,6 @@ export function PantallaAjustes() {
           </p>
           <p className="mt-3 font-mono text-lg text-luna">{codigo}</p>
           <p className="mt-1 text-xs text-silenciado">{ajustes.correoCliente}</p>
-          <button type="button" onClick={cerrarCuenta} className="mt-3 h-11 w-full rounded-lg bg-superficie-2 text-sm">
-            Cerrar sesión y pedir correo otra vez
-          </button>
         </section>
       )}
 

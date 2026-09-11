@@ -23,9 +23,12 @@ async function asegurarColumnasPro() {
   await sql.query("alter table clientes_app add column if not exists pro boolean not null default false");
   await sql.query("alter table clientes_app add column if not exists pro_en timestamptz");
   await sql.query("alter table clientes_app add column if not exists pro_hasta timestamptz");
+  await sql.query("alter table clientes_app add column if not exists baja boolean not null default false");
+  await sql.query("alter table clientes_app add column if not exists baja_en timestamptz");
 }
 
-function vigente(pro: boolean, hasta?: string | Date | null) {
+function vigente(pro: boolean, hasta?: string | Date | null, baja?: boolean) {
+  if (baja) return false;
   if (!pro) return false;
   if (!hasta) return true;
   return new Date(hasta).getTime() > Date.now();
@@ -60,12 +63,12 @@ export const registrarCliente = createServerFn({ method: "POST" })
           [id, correo, pais, telefono, nombre],
         );
       }
-      const filas = await sql.query<{ pro: boolean; pro_hasta: string | null }>(
-        "select coalesce(pro, false) as pro, pro_hasta from clientes_app where lower(correo) = $1 or id = $2 limit 1",
+      const filas = await sql.query<{ pro: boolean; pro_hasta: string | null; baja: boolean }>(
+        "select coalesce(pro, false) as pro, pro_hasta, coalesce(baja, false) as baja from clientes_app where lower(correo) = $1 or id = $2 limit 1",
         [correo, id],
       );
       const row = filas[0];
-      const pro = vigente(Boolean(row?.pro), row?.pro_hasta ?? null);
+      const pro = vigente(Boolean(row?.pro), row?.pro_hasta ?? null, Boolean(row?.baja));
       return { ok: true as const, codigo: codigoClienteDeCorreo(correo), pro, proHasta: row?.pro_hasta ?? null };
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error de red o base.";
@@ -82,7 +85,7 @@ export const listarClientes = createServerFn({ method: "POST" })
     const sql = await getSql();
     await asegurarColumnasPro();
     const items = (await sql.query(
-      "select id, correo, pais, telefono, nombre, creado_en, coalesce(pro, false) as pro, pro_en, pro_hasta from clientes_app order by creado_en desc limit 500",
+      "select id, correo, pais, telefono, nombre, creado_en, coalesce(pro, false) as pro, pro_en, pro_hasta, coalesce(baja, false) as baja, baja_en from clientes_app order by creado_en desc limit 500",
     )) as {
       id: string;
       correo: string;
@@ -93,11 +96,13 @@ export const listarClientes = createServerFn({ method: "POST" })
       pro: boolean;
       pro_en: string | null;
       pro_hasta: string | null;
+      baja: boolean;
+      baja_en: string | null;
     }[];
     return {
       ok: true as const,
       items: items.map((c) => {
-        const activo = vigente(Boolean(c.pro), c.pro_hasta);
+        const activo = vigente(Boolean(c.pro), c.pro_hasta, Boolean(c.baja));
         return { ...c, pro: activo, codigo: codigoClienteDeCorreo(c.correo) };
       }),
     };
@@ -115,7 +120,7 @@ export const marcarProCliente = createServerFn({ method: "POST" })
     const hasta = new Date(Date.now() + dias * 24 * 60 * 60 * 1000).toISOString();
     const filas = data.pro
       ? await sql.query<{ correo: string }>(
-          "update clientes_app set pro = true, pro_en = now(), pro_hasta = $1 where lower(correo) = $2 returning correo",
+          "update clientes_app set pro = true, baja = false, baja_en = null, pro_en = now(), pro_hasta = $1 where lower(correo) = $2 returning correo",
           [hasta, correo],
         )
       : await sql.query<{ correo: string }>(
@@ -126,6 +131,27 @@ export const marcarProCliente = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+export const darDeBajaCliente = createServerFn({ method: "POST" })
+  .validator((input: { claveAutor?: string; correo: string; baja: boolean }) => input)
+  .handler(async ({ data }) => {
+    if (!claveAutorOk(data.claveAutor)) return { ok: false as const, error: "Solo el autor puede dar de baja." };
+    const correo = data.correo.trim().toLowerCase();
+    if (!correoOk(correo)) return { ok: false as const, error: "Correo no válido." };
+    const sql = await getSql();
+    await asegurarColumnasPro();
+    const filas = data.baja
+      ? await sql.query<{ correo: string }>(
+          "update clientes_app set baja = true, baja_en = now(), pro = false where lower(correo) = $1 returning correo",
+          [correo],
+        )
+      : await sql.query<{ correo: string }>(
+          "update clientes_app set baja = false, baja_en = null where lower(correo) = $1 returning correo",
+          [correo],
+        );
+    if (!filas.length) return { ok: false as const, error: "No está ese cliente." };
+    return { ok: true as const };
+  });
+
 export const estadoProCliente = createServerFn({ method: "POST" })
   .validator((input: { correo: string }) => input)
   .handler(async ({ data }) => {
@@ -133,12 +159,12 @@ export const estadoProCliente = createServerFn({ method: "POST" })
     if (!correoOk(correo)) return { ok: true as const, pro: false, codigo: "", proEn: null as string | null, proHasta: null as string | null };
     const sql = await getSql();
     await asegurarColumnasPro();
-    const filas = await sql.query<{ pro: boolean; pro_en: string | null; pro_hasta: string | null }>(
-      "select coalesce(pro, false) as pro, pro_en, pro_hasta from clientes_app where lower(correo) = $1 limit 1",
+    const filas = await sql.query<{ pro: boolean; pro_en: string | null; pro_hasta: string | null; baja: boolean }>(
+      "select coalesce(pro, false) as pro, pro_en, pro_hasta, coalesce(baja, false) as baja from clientes_app where lower(correo) = $1 limit 1",
       [correo],
     );
     const row = filas[0];
-    const pro = vigente(Boolean(row?.pro), row?.pro_hasta ?? null);
+    const pro = vigente(Boolean(row?.pro), row?.pro_hasta ?? null, Boolean(row?.baja));
     return {
       ok: true as const,
       pro,

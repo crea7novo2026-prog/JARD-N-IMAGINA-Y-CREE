@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { BookOpen, Bug, ClipboardList, MessagesSquare, PenLine, Settings2, Store } from "lucide-react";
+import { BookOpen, Bug, ClipboardList, LogOut, MessagesSquare, PenLine, Settings2, Store } from "lucide-react";
+import { useJardin } from "@/lib/almacen";
 import { APP_FRASE, APP_NAME } from "@/lib/marca";
 
 const ITEMS = [
@@ -48,18 +49,45 @@ const ITEMS = [
   {
     to: "/ajustes",
     titulo: "Ajustes",
-    texto: "15 plantas de cortesía, luego $2 / $20. Código y autor.",
+    texto: "Sesión, código de cliente y plan.",
     icono: Settings2,
   },
 ] as const;
 
 export function PantallaMas() {
+  const setAjustes = useJardin((s) => s.setAjustes);
+  const correo = useJardin((s) => s.ajustes.correoCliente);
+
+  function cerrarSesion() {
+    setAjustes({
+      correoCliente: "",
+      telefonoCliente: "",
+      clienteListo: false,
+      demoPro: false,
+    });
+  }
+
   return (
     <main className="px-5 pb-8 pt-8">
       <p className="text-xs font-medium uppercase tracking-[0.18em] text-silenciado">Más</p>
       <h1 className="mt-1 text-2xl font-semibold leading-tight">{APP_NAME}</h1>
       <p className="mt-2 text-sm text-silenciado">{APP_FRASE}</p>
-      <ul className="mt-6 space-y-2">
+
+      <button
+        type="button"
+        onClick={cerrarSesion}
+        className="mt-5 flex min-h-16 w-full items-center gap-3 rounded-xl bg-luna px-4 text-left text-fondo"
+      >
+        <LogOut className="size-5" />
+        <span>
+          <span className="block text-sm font-semibold">Cerrar sesión</span>
+          <span className="block text-xs opacity-80">
+            {correo.includes("@") ? correo : "Volver a pedir nombre, correo y teléfono"}
+          </span>
+        </span>
+      </button>
+
+      <ul className="mt-4 space-y-2">
         {ITEMS.map((it) => {
           const Icono = it.icono;
           return (

@@ -1,12 +1,17 @@
 import type { Especie } from "@/lib/tipos";
 import { etiquetaTipo, etiquetaToxicidad } from "@/lib/cuidados";
+import { nombreNicaraguaDeEspecie } from "@/lib/nombres-nicaragua";
 
 export function ResumenCuidado({ especie }: { especie: Especie }) {
+  const ni = nombreNicaraguaDeEspecie(especie);
   return (
     <section className="mt-4 space-y-2 rounded-xl bg-superficie p-4 text-sm">
       <p className="text-xs uppercase tracking-[0.14em] text-luna">Cuidado ahora</p>
       <h3 className="text-base font-semibold">{especie.nombreComun}</h3>
       <p className="text-xs italic text-silenciado">{especie.nombreCientifico}</p>
+      {ni && ni !== especie.nombreComun && (
+        <p className="text-xs text-luna">En Nicaragua: {ni}</p>
+      )}
       <p>
         {etiquetaTipo(especie.tipo)} · riego cada {especie.waterFreqDays} días
       </p>

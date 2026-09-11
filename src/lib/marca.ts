@@ -8,6 +8,11 @@ export const CLAVE_AUTOR_DEFECTO = "LUNA-DIARIO";
 export const CORREO_AUTOR = "crea.7novo2026@gmail.com";
 export const WHATSAPP_VENTA_URL = "https://tinyurl.com/ViverosChat";
 
+export function codigoClienteDeCorreo(correo: string) {
+  const slug = correo.trim().toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 24);
+  return `CLI-${slug.slice(0, 8).toUpperCase()}`;
+}
+
 export function enlaceWhatsAppPedido(opts: {
   titulo: string;
   precio: string;

@@ -1,6 +1,7 @@
 import { especiePorId } from "./catalogo-especies";
 import { plagaPorId } from "./catalogo-plagas";
 import { fuentesOficiales } from "./fuentes";
+import { nombreEnNicaragua } from "./nombres-nicaragua";
 import type { Especie } from "./tipos";
 
 async function wikiResumen(titulo: string, origen: "es" | "en") {
@@ -127,10 +128,13 @@ export function armarInvestigacion(opts: {
   const e = opts.especie;
   const comun = e?.nombreComun || opts.nombre?.trim() || "Planta";
   const cienti = e?.nombreCientifico || opts.cientifico?.trim() || "";
+  const ni = nombreEnNicaragua({ id: e?.id, comun, cientifico: cienti });
   const tipo = e?.tipo ?? "interior";
   const bloques: string[] = [];
 
-  bloques.push(`1. Identidad\n${comun}${cienti ? ` (${cienti})` : ""}${e?.familia ? ` · familia ${e.familia}` : ""}. Tipo: ${tipoEtiqueta(tipo)}.`);
+  bloques.push(
+    `1. Identidad\n${comun}${cienti ? ` (${cienti})` : ""}${e?.familia ? ` · familia ${e.familia}` : ""}. Tipo: ${tipoEtiqueta(tipo)}.\nEn Nicaragua se conoce como: ${ni || comun}.`,
+  );
   if (opts.wiki) bloques.push(opts.wiki);
 
   bloques.push(`2. Tamaño y desarrollo\nAltura: ${alturaPorTipo(tipo)}\nCrecimiento: ${desarrolloPorTipo(tipo)}`);
@@ -143,7 +147,7 @@ export function armarInvestigacion(opts: {
   bloques.push(`5. Nutrición (orgánico, minerales y de vivero)\n${nutricion(e)}`);
   bloques.push(`6 y 7. Plagas y control\n${bloquePlagas(e)}`);
   bloques.push(
-    `8. Advertencias\n${e?.toxicidad && e.toxicidad !== "ninguna_conocida" ? `Toxicidad: ${e.toxicidad.replaceAll("_", " ")}.` : "Sin toxicidad conocida; igual lava manos después de podar."}`,
+    `8. Advertencias\n${e?.toxicidad && e.toxicidad !== "ninguna_conocida" ? `Toxicidad: ${e.toxicidad.replace(/_/g, " ")}.` : "Sin toxicidad conocida; igual lava manos después de podar."}`,
   );
   bloques.push(`9. Flor o fruto\n${florPorTipo(tipo)}`);
   bloques.push(`10. Reproducción\n${reproPorTipo(tipo)}`);

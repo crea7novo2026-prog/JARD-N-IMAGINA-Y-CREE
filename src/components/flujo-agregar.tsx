@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { buscarEspecies, especieEnBlanco, especiePorId, pistaPorNombreArchivo } from "@/lib/catalogo-especies";
 import { useJardin } from "@/lib/almacen";
 import { comprimirFoto } from "@/lib/foto";
+import { fichaAutomatica, fichaDeCatalogo } from "@/lib/ficha-auto";
 import { busquedaGooglePorNombre, enlacesLens } from "@/lib/fuentes";
 import { sugerirEspeciePorFoto } from "@/lib/servidor/identificar";
 import type { UbicacionPlanta } from "@/lib/tipos";
@@ -24,6 +25,7 @@ export function FlujoAgregar() {
   const [especieId, setEspecieId] = useState<string>();
   const [sugeridas, setSugeridas] = useState<string[]>([]);
   const [leyendo, setLeyendo] = useState(false);
+  const [ficha, setFicha] = useState("");
   const [apodo, setApodo] = useState("");
   const [nombrePropio, setNombrePropio] = useState("");
   const [ubicacion, setUbicacion] = useState<UbicacionPlanta>("patio");
@@ -42,20 +44,39 @@ export function FlujoAgregar() {
     return [...prior, ...base.filter((e) => !sugeridas.includes(e.id))].slice(0, 8);
   }, [q, sugeridas]);
   const especie = especieId ? especiePorId(especieId) : undefined;
+  const nombreBusca = (especie?.nombreComun || q).trim();
 
   function elegir(id: string) {
     setEspecieId(id);
     const esp = especiePorId(id);
-    if (esp) setApodo(esp.nombreComun);
+    if (esp) {
+      setApodo(esp.nombreComun);
+      setQ(esp.nombreComun);
+    }
     setError("");
+  }
+
+  async function cargarFicha(id?: string, nombre?: string, cientifico?: string) {
+    const esp = id ? especiePorId(id) : undefined;
+    const comun = esp?.nombreComun || nombre || "";
+    if (!comun) return;
+    setFicha(esp ? fichaDeCatalogo(esp.id) : `Nombre: ${comun}${cientifico ? ` (${cientifico})` : ""}`);
+    try {
+      const extra = await fichaAutomatica(comun, esp?.nombreCientifico || cientifico);
+      if (extra) setFicha(extra);
+    } catch {
+      /* sin red */
+    }
   }
 
   useEffect(() => {
     const n = q.trim();
     if (n.length < 4 || especieId) return;
     const hit = buscarEspecies(n)[0];
-    if (hit) elegir(hit.id);
-    // una sola autoelección por búsqueda
+    if (hit) {
+      elegir(hit.id);
+      void cargarFicha(hit.id);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
@@ -63,6 +84,7 @@ export function FlujoAgregar() {
     if (!f) return;
     try {
       setError("");
+      setFicha("");
       setLeyendo(true);
       const pistas = pistaPorNombreArchivo(f.name);
       const data = await comprimirFoto(f);
@@ -72,14 +94,18 @@ export function FlujoAgregar() {
       if (ids[0]) {
         setSugeridas(ids);
         elegir(ids[0]);
-        setLeyendo(false);
+        await cargarFicha(ids[0], r.nombre, r.cientifico);
+      } else if (r.nombre) {
+        setQ(r.nombre);
+        setApodo(r.nombre);
+        await cargarFicha(undefined, r.nombre, r.cientifico);
       } else {
-        setLeyendo(false);
         setError("No salió el nombre. Escríbelo abajo.");
       }
     } catch {
-      setLeyendo(false);
       setError("No se pudo leer la foto. Prueba otra.");
+    } finally {
+      setLeyendo(false);
     }
   }
 
@@ -132,7 +158,7 @@ export function FlujoAgregar() {
     <main className="px-5 pb-10 pt-8">
       <h1 className="text-2xl font-semibold">Nueva planta</h1>
       <p className="mt-2 text-base leading-relaxed text-silenciado">
-        Nombre o foto. Se guarda ya. La app busca el cuidado sola. Luego lo puedes cambiar.
+        Toma la foto. La app busca el nombre y el cuidado enseguida.
       </p>
       <div className="mt-4">
         <BarraDemo />
@@ -158,8 +184,14 @@ export function FlujoAgregar() {
       <input ref={archivoRef} type="file" accept="image/*" className="hidden" onChange={(e) => void onFoto(e.target.files?.[0])} />
 
       {foto && <MarcadorFoto src={foto} alt="" className="mt-4 max-h-64 w-full rounded-xl" />}
+      {leyendo && <p className="mt-3 text-sm text-luna">Buscando el nombre y el cuidado…</p>}
       {especie && <ResumenCuidado especie={especie} />}
-      {leyendo && <p className="mt-3 text-sm text-luna">Reconociendo la foto…</p>}
+      {ficha && (
+        <section className="mt-3 rounded-xl bg-superficie p-4 text-sm leading-relaxed text-silenciado">
+          <p className="text-xs uppercase tracking-[0.14em] text-luna">Información</p>
+          <p className="mt-2 whitespace-pre-wrap">{ficha}</p>
+        </section>
+      )}
 
       <label className="mt-5 flex h-14 items-center gap-2 rounded-xl bg-superficie px-3">
         <Search className="size-5 text-silenciado" />
@@ -183,7 +215,10 @@ export function FlujoAgregar() {
               <button
                 key={esp.id}
                 type="button"
-                onClick={() => elegir(esp.id)}
+                onClick={() => {
+                  elegir(esp.id);
+                  void cargarFicha(esp.id);
+                }}
                 className={`min-h-16 rounded-xl border px-3 py-2 text-left ${on ? "border-luna bg-superficie-2" : "border-borde bg-superficie"}`}
               >
                 <p className="text-sm font-medium">{esp.nombreComun}</p>
@@ -191,6 +226,23 @@ export function FlujoAgregar() {
               </button>
             );
           })}
+        </div>
+      )}
+
+      {(foto || nombreBusca.length >= 2) && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {enlacesLens(nombreBusca || "planta").slice(0, 2).map((f) => (
+            <a key={f.url} href={f.url} target="_blank" rel="noreferrer" className="rounded-lg bg-superficie px-3 py-2 text-xs text-luna">
+              {f.nombre}
+            </a>
+          ))}
+          {busquedaGooglePorNombre(nombreBusca || "planta")
+            .filter((f) => f.nombre === "Google")
+            .map((f) => (
+              <a key={f.url} href={f.url} target="_blank" rel="noreferrer" className="rounded-lg bg-superficie px-3 py-2 text-xs text-luna">
+                Google
+              </a>
+            ))}
         </div>
       )}
 
@@ -204,23 +256,6 @@ export function FlujoAgregar() {
         <button type="button" className="mt-2 text-sm text-luna" onClick={() => void fotoDesdeEnlace()}>
           Usar esa foto
         </button>
-      )}
-
-      {(q.trim().length >= 2 || especie) && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {enlacesLens(especie?.nombreComun || q).slice(0, 2).map((f) => (
-            <a key={f.url} href={f.url} target="_blank" rel="noreferrer" className="rounded-lg bg-superficie px-3 py-2 text-xs text-luna">
-              {f.nombre}
-            </a>
-          ))}
-          {busquedaGooglePorNombre(especie?.nombreComun || q)
-            .filter((f) => f.nombre === "Google")
-            .map((f) => (
-              <a key={f.url} href={f.url} target="_blank" rel="noreferrer" className="rounded-lg bg-superficie px-3 py-2 text-xs text-luna">
-                Google
-              </a>
-            ))}
-        </div>
       )}
 
       <label className="mt-4 block text-sm">

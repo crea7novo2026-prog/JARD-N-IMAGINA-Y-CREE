@@ -3,6 +3,7 @@ import { Leaf, MoonStar, MoreHorizontal, Store, SunMedium } from "lucide-react";
 import { useEffect } from "react";
 import { useJardin } from "@/lib/almacen";
 import { Avisador } from "@/components/avisador";
+import { ConfirmadorPago } from "@/components/confirmador-pago";
 import { PuertaCliente } from "@/components/puerta-cliente";
 import { Sincronizador } from "@/components/sincronizador";
 import { SincronizadorVivero } from "@/components/sincronizador-vivero";
@@ -18,9 +19,7 @@ const PESTANAS = [
 
 export function Cascaron({ children }: { children: React.ReactNode }) {
   const hidratar = useJardin((s) => s.hidratar);
-const ajustes = useJardin((s) => s.ajustes);
-
-
+  const ajustes = useJardin((s) => s.ajustes);
   const ruta = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
@@ -33,9 +32,7 @@ const ajustes = useJardin((s) => s.ajustes);
       <div className="marco-app">
         {!(ajustes.correoCliente.includes("@") && (ajustes.telefonoCliente || "").replace(/\D/g, "").length >= 6) ? (
           <PuertaCliente />
-        ) : ( 
-        
-       
+        ) : (
           <>
             <nav
               className="fixed bottom-0 left-1/2 z-40 w-full max-w-[430px] -translate-x-1/2 border-t border-borde bg-superficie/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md min-[900px]:static min-[900px]:max-w-none min-[900px]:translate-x-0 min-[900px]:border-r min-[900px]:border-t-0 min-[900px]:bg-superficie"
@@ -69,6 +66,7 @@ const ajustes = useJardin((s) => s.ajustes);
               <Sincronizador />
               <SincronizadorVivero />
               <Avisador />
+              <ConfirmadorPago />
               {children}
             </div>
           </>

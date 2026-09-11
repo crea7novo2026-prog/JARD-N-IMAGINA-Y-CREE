@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useJardin } from "@/lib/almacen";
 import { Avisador } from "@/components/avisador";
 import { ConfirmadorPago } from "@/components/confirmador-pago";
+import { ConsultorPro } from "@/components/consultor-pro";
 import { PuertaCliente } from "@/components/puerta-cliente";
 import { Sincronizador } from "@/components/sincronizador";
 import { SincronizadorVivero } from "@/components/sincronizador-vivero";
@@ -67,6 +68,7 @@ export function Cascaron({ children }: { children: React.ReactNode }) {
               <SincronizadorVivero />
               <Avisador />
               <ConfirmadorPago />
+              <ConsultorPro />
               {children}
             </div>
           </>

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useJardin } from "@/lib/almacen";
+import { SALA_VIVERO } from "@/lib/marca";
 import { publicarJardin, traerJardin } from "@/lib/servidor/sincronizar";
 import type { Conocimiento, Especie, FichaAutor } from "@/lib/tipos";
 
@@ -9,7 +10,6 @@ export function Sincronizador() {
   const conocimiento = useJardin((s) => s.conocimiento);
   const fichasAutor = useJardin((s) => s.fichasAutor);
   const codigo = useJardin((s) => s.ajustes.codigoJardin);
-  const codigoAct = useJardin((s) => s.ajustes.codigoActualizacion);
   const primer = useRef(true);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -31,7 +31,7 @@ export function Sincronizador() {
           local.setAjustes({ syncEn: remoto.exportadoEn ?? new Date().toISOString(), codigoJardin: codigo });
         }
       } catch {
-        /* sin red: el diario local sigue */
+        /* sin red */
       }
     })();
     return () => {
@@ -40,11 +40,10 @@ export function Sincronizador() {
   }, [codigo]);
 
   useEffect(() => {
-    if (!codigoAct) return;
     let vivo = true;
     void (async () => {
       try {
-        const r = await traerJardin({ data: { codigo: codigoAct } });
+        const r = await traerJardin({ data: { codigo: SALA_VIVERO } });
         if (!vivo || !r.ok || !r.carga) return;
         const pack = JSON.parse(r.carga) as {
           tipo?: string;
@@ -78,7 +77,7 @@ export function Sincronizador() {
     return () => {
       vivo = false;
     };
-  }, [codigoAct, fichasAutor.length]);
+  }, [fichasAutor.length]);
 
   useEffect(() => {
     if (!codigo) return;

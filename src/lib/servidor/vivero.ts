@@ -30,22 +30,24 @@ export const hacerPedido = createServerFn({ method: "POST" })
     const sala = data.sala.trim().toUpperCase();
     const cliente = data.cliente.trim().slice(0, 60);
     const contacto = data.contacto.trim().slice(0, 80);
-    const cuando = data.cuando.trim();
+    const cuando = (data.cuando.trim() || new Date().toISOString().slice(0, 10)).slice(0, 40);
     const titulo = data.titulo.trim().slice(0, 80);
-    if (!salaOk(sala) || !cliente || !cuando || !data.ofertaId) {
-      return { ok: false as const, error: "Faltan nombre, planta o fecha del pedido.", duplicado: false, id: "" };
+    if (!salaOk(sala) || !cliente || !titulo) {
+      return { ok: false as const, error: "Faltan nombre o planta del pedido.", duplicado: false, id: "" };
     }
     const sql = await getSql();
     const cant = Math.min(20, Math.max(1, Math.round(data.cantidad) || 1));
     const ya = await sql.query<{ id: string }>(
       `select id from comunidad_pedido
-       where sala = $1 and oferta_id = $2
+       where sala = $1
+         and lower(titulo) = lower($2)
          and lower(cliente) = lower($3)
          and coalesce(contacto,'') = $4
          and cuando = $5
-         and creado_en > now() - interval '2 days'
-       order by creado_en desc limit 1`,
-      [sala, data.ofertaId, cliente, contacto, cuando.slice(0, 40)],
+         and estado not in ('cancelado')
+         and creado_en > now() - interval '7 days'
+       order by creado_en asc limit 1`,
+      [sala, titulo, cliente, contacto, cuando],
     );
     if (ya[0]?.id) {
       return { ok: true as const, id: ya[0].id, duplicado: true };
@@ -54,9 +56,9 @@ export const hacerPedido = createServerFn({ method: "POST" })
     await sql`
       insert into comunidad_pedido (id, sala, oferta_id, titulo, cliente, contacto, cantidad, nota, cuando, estado)
       values (
-        ${id}, ${sala}, ${data.ofertaId}, ${titulo},
+        ${id}, ${sala}, ${data.ofertaId || "wa"}, ${titulo},
         ${cliente}, ${contacto}, ${cant},
-        ${data.nota.trim().slice(0, 240)}, ${cuando.slice(0, 40)}, 'pedido'
+        ${data.nota.trim().slice(0, 240)}, ${cuando}, 'pedido'
       )
     `;
     return { ok: true as const, id, duplicado: false };
@@ -75,8 +77,13 @@ export const listarPedidos = createServerFn({ method: "POST" })
       `select id, oferta_id, titulo, cliente, contacto, cantidad, nota, cuando, estado, creado_en
        from comunidad_pedido
        where sala = $1
-       order by creado_en desc
-       limit 80`,
+       order by
+         case when estado in ('entregado','cancelado') then 1 else 0 end,
+         cuando asc nulls last,
+         lower(cliente),
+         lower(titulo),
+         creado_en asc
+       limit 120`,
       [sala],
     ) as {
       id: string;
@@ -107,4 +114,31 @@ export const marcarPedido = createServerFn({ method: "POST" })
       where id = ${data.id} and sala = ${data.sala.trim().toUpperCase()}
     `;
     return { ok: true as const };
+  });
+
+export const limpiarCopiasPedido = createServerFn({ method: "POST" })
+  .validator((input: { sala: string; claveAutor?: string }) => input)
+  .handler(async ({ data }) => {
+    if (!claveAutorOk(data.claveAutor)) return { ok: false as const, quitados: 0 };
+    const sala = data.sala.trim().toUpperCase();
+    const sql = await getSql();
+    const r = await sql.query<{ n: string }>(
+      `update comunidad_pedido p
+       set estado = 'cancelado'
+       where p.sala = $1
+         and p.estado = 'pedido'
+         and exists (
+           select 1 from comunidad_pedido q
+           where q.sala = p.sala
+             and lower(q.titulo) = lower(p.titulo)
+             and lower(q.cliente) = lower(p.cliente)
+             and coalesce(q.contacto,'') = coalesce(p.contacto,'')
+             and q.cuando = p.cuando
+             and q.creado_en < p.creado_en
+             and q.estado <> 'cancelado'
+         )
+       returning p.id`,
+      [sala],
+    );
+    return { ok: true as const, quitados: r.length };
   });

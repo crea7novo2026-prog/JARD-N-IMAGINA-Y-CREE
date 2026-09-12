@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ListaPedidos } from "@/components/lista-pedidos";
 import { CLAVE_AUTOR_DEFECTO } from "@/lib/marca";
 import { descargarPdfClientes } from "@/lib/pdf-clientes";
 import { darDeBajaCliente, listarClientes, marcarProCliente } from "@/lib/servidor/clientes";
@@ -70,6 +71,8 @@ export function ListaClientes() {
   }
 
   return (
+    <>
+      <ListaPedidos />
     <section className="mt-5 rounded-xl bg-superficie p-4">
       <p className="text-sm font-medium">Base de clientes (solo tú)</p>
       <p className="mt-1 text-xs text-silenciado">
@@ -155,5 +158,6 @@ export function ListaClientes() {
       </button>
       {aviso && <p className="mt-2 text-xs text-luna">{aviso}</p>}
     </section>
+    </>
   );
 }
